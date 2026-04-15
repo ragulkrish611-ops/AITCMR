@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fleet-Sync Pro | Vertical Stack Edition</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        darkBg: '#020617',
+                        darkCard: '#0f172a',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; transition: background-color 0.3s ease, color 0.3s ease; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+        
+        .nav-link { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 12px; cursor: pointer; }
+        .nav-link:hover { transform: translateX(6px); }
+        .nav-active { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important; color: white !important; box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4); }
+        
+        .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(226, 232, 240, 0.8); border-radius: 1.5rem; }
+        .dark .glass-card { background: rgba(15, 23, 42, 0.8); border-color: rgba(30, 41, 59, 0.8); }
+        
+        .input-field { border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 0.75rem 1rem; width: 100%; transition: all 0.2s; background: white; font-weight: 500; }
+        .dark .input-field { background: #020617; border-color: #1e293b; color: white; }
+        .input-field:focus { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); outline: none; }
+        
+        /* Fixed: Ensure the hardware list does not overflow horizontally */
+        .hardware-stack { display: flex; flex-direction: column; gap: 0.5rem; min-width: 220px; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .page-animate { animation: fadeIn 0.4s ease-out forwards; }
+    </style>
+</head>
+
+<body class="bg-slate-50 dark:bg-darkBg text-slate-900 dark:text-slate-100">
+
+<div class="flex flex-col lg:flex-row min-h-screen">
+    <aside class="w-full lg:w-72 bg-slate-950 p-6 flex flex-col shadow-2xl z-50">
+        <div class="flex items-center gap-4 mb-10 px-2">
+            <div class="bg-blue-600 p-2.5 rounded-2xl text-white">
+                <i data-lucide="shield-check" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-extrabold text-white">FleetSync <span class="text-blue-500">Pro</span></h1>
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Industrial Terminal</p>
+            </div>
+        </div>
+
+        <nav class="flex-1 space-y-2">
+            <div onclick="showPage('dash', this)" class="nav-link nav-active flex items-center gap-3 px-4 py-3.5 font-bold text-slate-400">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i> Dashboard
+            </div>
+            <div id="nav-form" onclick="showPage('form', this)" class="nav-link flex items-center gap-3 px-4 py-3.5 font-bold text-slate-400">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i> Add/Edit Record
+            </div>
+            <div onclick="showPage('list', this)" class="nav-link flex items-center gap-3 px-4 py-3.5 font-bold text-slate-400">
+                <i data-lucide="database" class="w-5 h-5"></i> Fleet Database
+            </div>
+        </nav>
+
+        <button onclick="toggleDarkMode()" class="mt-6 flex items-center justify-between bg-slate-900 text-white px-4 py-3 rounded-xl transition">
+            <span class="text-sm font-bold">Theme</span>
+            <div class="w-8 h-4 bg-slate-700 rounded-full relative">
+                <div class="dot absolute left-1 top-1 bg-white w-2 h-2 rounded-full transition-all"></div>
+            </div>
+        </button>
+    </aside>
+
+    <main class="flex-1 p-6 lg:p-10 h-screen overflow-y-auto">
+        <div id="dash" class="page-content page-animate">
+            <div class="mb-10">
+                <h2 class="text-4xl font-black">Operations Hub</h2>
+                <p id="currentDate" class="text-slate-400 font-medium"></p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+                <div class="glass-card p-6 shadow-sm"><p class="text-slate-400 text-[10px] font-bold uppercase">Companies</p><h3 class="text-4xl font-black mt-1" id="statTotal">0</h3></div>
+                <div class="glass-card p-6 shadow-sm"><p class="text-slate-400 text-[10px] font-bold uppercase text-blue-500">Instruments</p><h3 class="text-4xl font-black mt-1 text-blue-600" id="statInst">0</h3></div>
+                <div class="glass-card p-6 shadow-sm"><p class="text-slate-400 text-[10px] font-bold uppercase text-emerald-500">Service Coverage</p><h3 class="text-4xl font-black mt-1 text-emerald-600" id="statDist">0</h3></div>
+                <div class="glass-card p-6 shadow-sm"><p class="text-slate-400 text-[10px] font-bold uppercase text-orange-500">Latest Active</p><h3 class="text-lg font-black mt-1 truncate" id="statRecent">None</h3></div>
+            </div>
+
+            <div class="glass-card p-8 shadow-sm h-[400px]">
+                <h3 class="font-bold text-lg mb-6">Regional Distribution (TN Districts)</h3>
+                <canvas id="mainChart"></canvas>
+            </div>
+        </div>
+
+        <div id="form" class="page-content hidden page-animate">
+            <div class="max-w-5xl mx-auto">
+                <div class="mb-8 text-center">
+                    <h2 class="text-3xl font-black" id="formTitle">Instrument Configuration</h2>
+                    <p class="text-slate-400">Add new client data or update existing service paths</p>
+                </div>
+                
+                <div class="glass-card p-8 shadow-xl space-y-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="space-y-1"><label class="text-[10px] font-bold uppercase text-slate-400">Company Name</label><input id="inClient" class="input-field" placeholder="Client Name"></div>
+                        <div class="space-y-1"><label class="text-[10px] font-bold uppercase text-slate-400">Industry</label><input id="inIndustry" class="input-field" placeholder="Textile/Chemical"></div>
+                        <div class="space-y-1"><label class="text-[10px] font-bold uppercase text-slate-400">Mobile / WhatsApp</label><input id="inMobile" class="input-field" placeholder="+91"></div>
+                        <div class="space-y-1"><label class="text-[10px] font-bold uppercase text-slate-400">Email Address</label><input id="inEmail" class="input-field" placeholder="contact@company.com"></div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold uppercase text-slate-400">District</label>
+                            <select id="inDist" class="input-field">
+                                <option value="">Select District</option>
+                                <option>Ariyalur</option><option>Chengalpattu</option><option>Chennai</option><option>Coimbatore</option>
+                                <option>Cuddalore</option><option>Dharmapuri</option><option>Dindigul</option><option>Erode</option>
+                                <option>Kallakurichi</option><option>Kanchipuram</option><option>Kanniyakumari</option><option>Karur</option>
+                                <option>Krishnagiri</option><option>Madurai</option><option>Mayiladuthurai</option><option>Nagapattinam</option>
+                                <option>Namakkal</option><option>Nilgiris</option><option>Perambalur</option><option>Pudukkottai</option>
+                                <option>Ramanathapuram</option><option>Ranipet</option><option>Salem</option><option>Sivaganga</option>
+                                <option>Tenkasi</option><option>Thanjavur</option><option>Theni</option><option>Thoothukudi</option>
+                                <option>Tiruchirappalli</option><option>Tirunelveli</option><option>Tirupathur</option><option>Tiruppur</option>
+                                <option>Tiruvallur</option><option>Tiruvannamalai</option><option>Tiruvarur</option><option>Vellore</option>
+                                <option>Viluppuram</option><option>Virudhunagar</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1"><label class="text-[10px] font-bold uppercase text-slate-400">Company Address</label><input id="inVillage" class="input-field" placeholder="Area / Village"></div>
+                    </div>
+
+                    <div id="instrumentContainer" class="space-y-4">
+                        <p class="text-[10px] font-bold uppercase text-blue-500 mb-2">Hardware Setup</p>
+                    </div>
+
+                    <div class="flex flex-col md:flex-row gap-4 pt-4">
+                        <button onclick="addInstrumentRow()" class="flex-1 bg-slate-100 dark:bg-slate-800 font-bold py-4 rounded-xl hover:bg-slate-200 transition">+ Add Row</button>
+                        <button onclick="saveData()" class="flex-[2] bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-blue-700 transition" id="saveBtn">Confirm Registration</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="list" class="page-content hidden page-animate">
+            <div class="flex justify-between items-center mb-8">
+                <div><h2 class="text-3xl font-black">Fleet Database</h2><p class="text-slate-400">Total Asset Overview</p></div>
+                <button onclick="exportToExcel()" class="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold text-sm">Export to Excel</button>
+            </div>
+
+            <div class="mb-6 relative">
+                <input id="qBox" onkeyup="renderData()" placeholder="Filter by Name, District, Hardware..." class="input-field py-4 pl-12 shadow-sm">
+                <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5"></i>
+            </div>
+
+            <div class="glass-card overflow-hidden shadow-xl">
+                <div class="overflow-x-auto">
+                    <table id="fleetTable" class="w-full text-left">
+                        <thead>
+                            <tr class="bg-slate-50 dark:bg-slate-900/50 text-[11px] uppercase font-black text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                                <th class="px-8 py-5">Client Info</th>
+                                <th class="px-8 py-5">Location / Contact</th>
+                                <th class="px-8 py-5">Hardware Configuration</th>
+                                <th class="px-8 py-5 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fleetBody" class="divide-y divide-slate-100 dark:divide-slate-800"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<datalist id="masterInstruments">
+    <option value="SPM"> <option value="OCEMS"> <option value="VOC"> <option value="TDS"> <option value="OPESAN">
+</datalist>
+<datalist id="masterLoggers">
+    <option value="mcom"> <option value="samyak"> <option value="ait v1"> <option value="trtdlaita"> <option value="system ole">
+</datalist>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, push, onValue, remove, set } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDQRKnsV0aFglvXU52V8LkeRmb3godaKyg",
+        authDomain: "rk-tech-eb179.firebaseapp.com",
+        databaseURL: "https://rk-tech-eb179-default-rtdb.firebaseio.com",
+        projectId: "rk-tech-eb179"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    let masterData = [];
+    let myChart;
+    let editingId = null;
+
+    document.getElementById('currentDate').innerText = new Date().toDateString();
+
+    window.showPage = (id, btn) => {
+        document.querySelectorAll('.page-content').forEach(p => p.classList.add('hidden'));
+        document.getElementById(id).classList.remove('hidden');
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('nav-active'));
+        if(btn) btn.classList.add('nav-active');
+        if(id !== 'form') { editingId = null; resetForm(); }
+    };
+
+    window.addInstrumentRow = () => {
+        const container = document.getElementById('instrumentContainer');
+        const div = document.createElement('div');
+        div.className = "grid grid-cols-1 lg:grid-cols-12 gap-3 inst-row p-4 bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800 mt-2";
+        div.innerHTML = `
+            <div class="lg:col-span-3"><input list="masterInstruments" class="inst-type input-field" placeholder="Type"></div>
+            <div class="lg:col-span-3"><input list="masterLoggers" class="inst-logger input-field" placeholder="Logger"></div>
+            <div class="lg:col-span-2"><input class="inst-model input-field" placeholder="Model"></div>
+            <div class="lg:col-span-3"><input class="inst-path input-field" placeholder="Data Path/URL"></div>
+            <div class="lg:col-span-1 flex items-center justify-center gap-1">
+                <button onclick="duplicateRow(this)" class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><i data-lucide="copy" class="w-4 h-4"></i></button>
+                <button onclick="this.closest('.inst-row').remove()" class="p-2 text-red-500 hover:bg-red-50 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            </div>
+        `;
+        container.appendChild(div);
+        lucide.createIcons();
+    };
+
+    window.duplicateRow = (btn) => {
+        const row = btn.closest('.inst-row');
+        const type = row.querySelector('.inst-type').value;
+        const logger = row.querySelector('.inst-logger').value;
+        const model = row.querySelector('.inst-model').value;
+        const path = row.querySelector('.inst-path').value;
+        window.addInstrumentRow();
+        const rows = document.querySelectorAll('.inst-row');
+        const last = rows[rows.length - 1];
+        last.querySelector('.inst-type').value = type; last.querySelector('.inst-logger').value = logger;
+        last.querySelector('.inst-model').value = model; last.querySelector('.inst-path').value = path;
+    };
+
+    window.addInstrumentRow();
+
+    window.saveData = () => {
+        const instruments = Array.from(document.querySelectorAll('.inst-row')).map(r => ({
+            type: r.querySelector('.inst-type').value,
+            logger: r.querySelector('.inst-logger').value,
+            model: r.querySelector('.inst-model').value,
+            path: r.querySelector('.inst-path').value
+        })).filter(i => i.type);
+
+        const payload = {
+            client: document.getElementById('inClient').value,
+            industry: document.getElementById('inIndustry').value,
+            mobile: document.getElementById('inMobile').value,
+            gmail: document.getElementById('inEmail').value,
+            district: document.getElementById('inDist').value,
+            village: document.getElementById('inVillage').value,
+            instruments,
+            timestamp: Date.now()
+        };
+
+        if(!payload.client) return alert("Company Name is required!");
+
+        if(editingId) {
+            set(ref(db, 'fleet_v7/' + editingId), payload).then(() => { alert("Updated!"); location.reload(); });
+        } else {
+            push(ref(db, 'fleet_v7'), payload).then(() => { alert("Saved!"); location.reload(); });
+        }
+    };
+
+    onValue(ref(db, 'fleet_v7'), snap => {
+        const data = snap.val() || {};
+        masterData = Object.keys(data).map(k => ({ id: k, ...data[k] }));
+        renderData();
+    });
+
+    window.renderData = () => {
+        const q = document.getElementById('qBox').value.toLowerCase();
+        const tbody = document.getElementById('fleetBody');
+        tbody.innerHTML = "";
+        let stats = { total: 0, inst: 0, dists: new Set(), recent: "None" };
+
+        masterData.filter(d => (d.client || "").toLowerCase().includes(q) || (d.district || "").toLowerCase().includes(q)).forEach(d => {
+            stats.total++; stats.inst += (d.instruments || []).length;
+            if(d.district) stats.dists.add(d.district); stats.recent = d.client;
+
+            const wa = `https://wa.me/${d.mobile?.replace(/\D/g, '')}`;
+            const mail = `mailto:${d.gmail}`;
+
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-900/40 align-top">
+                    <td class="px-8 py-5">
+                        <div class="font-bold text-slate-900 dark:text-white text-lg">${d.client}</div>
+                        <div class="text-[10px] font-black text-blue-500 uppercase tracking-tighter">${d.industry || 'General'}</div>
+                    </td>
+                    <td class="px-8 py-5">
+                        <div class="text-sm font-bold text-slate-700 dark:text-slate-300">${d.district}</div>
+                        <div class="text-[11px] text-slate-400 mb-3">${d.village || ''}</div>
+                        <div class="flex gap-4">
+                            <a href="${wa}" target="_blank" class="text-emerald-500"><i data-lucide="message-square" class="w-5 h-5"></i></a>
+                            <a href="${mail}" class="text-blue-500"><i data-lucide="mail" class="w-5 h-5"></i></a>
+                        </div>
+                    </td>
+                    <td class="px-8 py-5">
+                        <div class="hardware-stack">
+                            ${(d.instruments || []).map(i => `
+                                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl shadow-sm">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-[11px] font-extrabold text-blue-600 uppercase">${i.type}</span>
+                                        <span class="text-[9px] text-slate-400 italic">${i.logger}</span>
+                                    </div>
+                                    <div class="text-[9px] text-slate-500 truncate max-w-[180px]">${i.path || ''}</div>
+                                </div>`).join('')}
+                        </div>
+                    </td>
+                    <td class="px-8 py-5 text-right">
+                        <div class="flex justify-end gap-2">
+                            <button onclick="editEntry('${d.id}')" class="text-slate-400 hover:text-blue-500"><i data-lucide="edit-3" class="w-5 h-5"></i></button>
+                            <button onclick="deleteEntry('${d.id}')" class="text-slate-400 hover:text-red-500"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+        });
+
+        document.getElementById('statTotal').innerText = stats.total;
+        document.getElementById('statInst').innerText = stats.inst;
+        document.getElementById('statDist').innerText = stats.dists.size;
+        document.getElementById('statRecent').innerText = stats.recent;
+        updateChart(masterData);
+        lucide.createIcons();
+    };
+
+    window.editEntry = (id) => {
+        const item = masterData.find(d => d.id === id);
+        if(!item) return;
+        editingId = id;
+        document.getElementById('inClient').value = item.client;
+        document.getElementById('inIndustry').value = item.industry;
+        document.getElementById('inMobile').value = item.mobile;
+        document.getElementById('inEmail').value = item.gmail;
+        document.getElementById('inDist').value = item.district;
+        document.getElementById('inVillage').value = item.village;
+        
+        const container = document.getElementById('instrumentContainer');
+        container.innerHTML = '<p class="text-[10px] font-bold uppercase text-blue-500 mb-2">Hardware Setup</p>';
+        (item.instruments || []).forEach(inst => {
+            window.addInstrumentRow();
+            const rows = document.querySelectorAll('.inst-row');
+            const last = rows[rows.length - 1];
+            last.querySelector('.inst-type').value = inst.type;
+            last.querySelector('.inst-logger').value = inst.logger;
+            last.querySelector('.inst-model').value = inst.model;
+            last.querySelector('.inst-path').value = inst.path;
+        });
+
+        document.getElementById('formTitle').innerText = "Update Record";
+        document.getElementById('saveBtn').innerText = "Update Database";
+        showPage('form', document.getElementById('nav-form'));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    function resetForm() {
+        document.getElementById('inClient').value = "";
+        document.getElementById('formTitle').innerText = "Instrument Configuration";
+        document.getElementById('saveBtn').innerText = "Confirm Registration";
+    }
+
+    window.deleteEntry = (id) => { if(confirm("Delete record permanently?")) remove(ref(db, 'fleet_v7/'+id)); };
+
+    window.exportToExcel = () => {
+        const ws = XLSX.utils.table_to_sheet(document.getElementById("fleetTable"));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Service_Database");
+        XLSX.writeFile(wb, "Industrial_Fleet_Export.xlsx");
+    };
+
+    function updateChart(data) {
+        const distCount = {};
+        data.forEach(d => { if(d.district) distCount[d.district] = (distCount[d.district] || 0) + 1; });
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if(myChart) myChart.destroy();
+        myChart = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: Object.keys(distCount), datasets: [{ data: Object.values(distCount), backgroundColor: '#3b82f6', borderRadius: 8 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+
+    window.toggleDarkMode = () => {
+        document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+        renderData();
+    };
+
+    if (localStorage.getItem('theme') === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.querySelector('.dot').style.transform = 'translateX(16px)';
+    }
+
+    lucide.createIcons();
+</script>
+</body>
+</html>

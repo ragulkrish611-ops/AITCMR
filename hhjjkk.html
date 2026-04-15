@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fleet-Sync Pro | Industrial Monitoring</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        darkBg: '#020617',
+                        darkCard: '#0f172a',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+        .nav-link { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 12px; cursor: pointer; }
+        .nav-link:hover { transform: translateX(6px); }
+        .nav-active { 
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important; 
+            color: white !important; 
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4); 
+        }
+
+        .glass-card { 
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            border-radius: 1.5rem;
+        }
+
+        .dark .glass-card {
+            background: rgba(15, 23, 42, 0.8);
+            border-color: rgba(30, 41, 59, 0.8);
+        }
+
+        .input-field { 
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem; 
+            padding: 0.75rem 1rem;
+            width: 100%;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .dark .input-field {
+            background: #020617;
+            border-color: #1e293b;
+            color: white;
+        }
+
+        .input-field:focus { 
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .page-animate { animation: fadeIn 0.4s ease-out forwards; }
+    </style>
+</head>
+
+<body class="bg-slate-50 dark:bg-darkBg text-slate-900 dark:text-slate-100">
+
+<div class="flex flex-col lg:flex-row min-h-screen">
+
+    <aside class="w-full lg:w-72 bg-slate-950 p-6 flex flex-col shadow-2xl z-50">
+        <div class="flex items-center gap-4 mb-10 px-2">
+            <div class="bg-blue-600 p-2.5 rounded-2xl text-white shadow-lg shadow-blue-600/30">
+                <i data-lucide="activity" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-extrabold text-white tracking-tight">FleetSync <span class="text-blue-500">Pro</span></h1>
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Live Terminal</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 space-y-2">
+            <div onclick="showPage('dash', this)" class="nav-link nav-active flex items-center gap-3 px-4 py-3.5 font-bold text-slate-400">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i> Analytics Hub
+            </div>
+            <div onclick="showPage('form', this)" class="nav-link flex items-center gap-3 px-4 py-3.5 font-bold text-slate-400">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i> Register Fleet
+            </div>
+            <div onclick="showPage('list', this)" class="nav-link flex items-center gap-3 px-4 py-3.5 font-bold text-slate-400">
+                <i data-lucide="server" class="w-5 h-5"></i> Fleet Inventory
+            </div>
+        </nav>
+
+        <div class="pt-6 border-t border-slate-900">
+            <button onclick="toggleDarkMode()" class="w-full flex items-center justify-between bg-slate-900 hover:bg-slate-800 text-white px-4 py-3 rounded-xl transition shadow-inner">
+                <div class="flex items-center gap-3 font-bold text-sm">
+                    <i data-lucide="moon" class="w-4 h-4"></i> Night Mode
+                </div>
+                <div id="themeToggle" class="w-8 h-4 bg-slate-700 rounded-full relative">
+                    <div class="dot absolute left-1 top-1 bg-white w-2 h-2 rounded-full transition-all"></div>
+                </div>
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 p-6 lg:p-10 h-screen overflow-y-auto">
+
+        <div id="dash" class="page-content page-animate">
+            <div class="flex justify-between items-end mb-10">
+                <div>
+                    <p class="text-blue-600 font-bold text-sm uppercase tracking-widest mb-1">Performance</p>
+                    <h2 class="text-4xl font-black">Operational Overview</h2>
+                </div>
+                <div class="text-right hidden md:block">
+                    <p class="text-slate-400 text-sm font-medium" id="currentDate"></p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+                <div class="glass-card p-6 shadow-sm group hover:shadow-xl transition-all duration-300">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg"><i data-lucide="building" class="w-5 h-5"></i></div>
+                    </div>
+                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Companies</p>
+                    <h3 class="text-4xl font-black mt-1" id="statTotal">0</h3>
+                </div>
+                <div class="glass-card p-6 shadow-sm group hover:shadow-xl transition-all duration-300">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-lg"><i data-lucide="zap" class="w-5 h-5"></i></div>
+                    </div>
+                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Active SPM</p>
+                    <h3 class="text-4xl font-black mt-1 text-orange-600" id="statSpm">0</h3>
+                </div>
+                <div class="glass-card p-6 shadow-sm group hover:shadow-xl transition-all duration-300">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-lg"><i data-lucide="shield-check" class="w-5 h-5"></i></div>
+                    </div>
+                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Active OCEMS</p>
+                    <h3 class="text-4xl font-black mt-1 text-emerald-600" id="statOcems">0</h3>
+                </div>
+                <div class="glass-card p-6 shadow-sm group hover:shadow-xl transition-all duration-300">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 rounded-lg"><i data-lucide="cpu" class="w-5 h-5"></i></div>
+                    </div>
+                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Other Units</p>
+                    <h3 class="text-4xl font-black mt-1 text-slate-500" id="statOther">0</h3>
+                </div>
+            </div>
+
+            <div class="glass-card p-8 shadow-sm">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-bold text-lg">Regional Distribution</h3>
+                    <div class="flex gap-2">
+                        <span class="w-3 h-3 bg-blue-500 rounded-full"></span>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">Units per District</span>
+                    </div>
+                </div>
+                <div class="h-[400px]">
+                    <canvas id="mainChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="form" class="page-content hidden page-animate">
+            <div class="max-w-4xl mx-auto">
+                <div class="mb-8 text-center">
+                    <h2 class="text-3xl font-black">Fleet Registration</h2>
+                    <p class="text-slate-400">Deploy new monitoring units to the cloud database</p>
+                </div>
+                
+                <div class="glass-card p-8 shadow-xl space-y-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold uppercase text-slate-400 ml-1">Client Name</label>
+                            <input id="inClient" class="input-field" placeholder="Acme Corp">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold uppercase text-slate-400 ml-1">Industry Type</label>
+                            <input id="inIndustry" class="input-field" placeholder="Manufacturing">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold uppercase text-slate-400 ml-1">Mobile / WhatsApp</label>
+                            <input id="inMobile" type="tel" class="input-field" placeholder="+91 98765 43210">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold uppercase text-slate-400 ml-1">Email Address</label>
+                            <input id="inEmail" type="email" class="input-field" placeholder="contact@client.com">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold uppercase text-slate-400 ml-1">District</label>
+                            <select id="inDist" class="input-field">
+                                <option value="">Select Location</option>
+                                <option>Coimbatore</option><option>Chennai</option><option>Tiruchirappalli</option><option>Salem</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold uppercase text-slate-400 ml-1">Village/Area</label>
+                            <input id="inVillage" class="input-field" placeholder="Industrial Estate">
+                        </div>
+                    </div>
+
+                    <div id="instrumentContainer" class="space-y-4">
+                        <p class="text-[10px] font-bold uppercase text-blue-500">Hardware Configuration</p>
+                        <div class="flex gap-4 inst-row p-5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                            <div class="flex-1">
+                                <input list="masterInstruments" class="inst-type input-field" placeholder="Instrument Type (SPM, OCEMS...)">
+                            </div>
+                            <div class="w-1/3">
+                                <input class="inst-model input-field" placeholder="Model No.">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col md:flex-row gap-4 pt-4">
+                        <button onclick="addInstrumentRow()" class="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold py-4 rounded-xl transition">
+                            + Add Instrument
+                        </button>
+                        <button onclick="saveData()" class="flex-[2] bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-600/20 transition transform active:scale-95">
+                            Confirm Deployment
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="list" class="page-content hidden page-animate">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                <div>
+                    <h2 class="text-3xl font-black">Fleet Inventory</h2>
+                    <p class="text-slate-400">Manage and export registered devices</p>
+                </div>
+                <div class="flex gap-3 no-print">
+                    <button onclick="exportToExcel()" class="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-6 py-3 rounded-xl font-bold text-sm hover:bg-emerald-600 hover:text-white transition">Export Excel</button>
+                    <button onclick="window.print()" class="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-black transition">Print PDF</button>
+                </div>
+            </div>
+
+            <div class="mb-6 relative no-print">
+                <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></i>
+                <input id="qBox" onkeyup="renderData()" placeholder="Search by client name, industry, or district..." class="input-field pl-12 py-4 shadow-sm">
+            </div>
+
+            <div class="glass-card overflow-hidden shadow-xl">
+                <div class="overflow-x-auto">
+                    <table id="fleetTable" class="w-full text-left">
+                        <thead>
+                            <tr class="bg-slate-50 dark:bg-slate-900/50 text-[11px] uppercase font-black text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                                <th class="px-8 py-5">Client Profile</th>
+                                <th class="px-8 py-5">Contact Details</th>
+                                <th class="px-8 py-5">Location</th>
+                                <th class="px-8 py-5">Deployment</th>
+                                <th class="px-8 py-5 text-right no-print">Manage</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fleetBody" class="divide-y divide-slate-100 dark:divide-slate-800"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<datalist id="masterInstruments">
+    <option value="SPM"> <option value="OCEMS"> <option value="AAQMS"> <option value="CEMS">
+</datalist>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDQRKnsV0aFglvXU52V8LkeRmb3godaKyg",
+        authDomain: "rk-tech-eb179.firebaseapp.com",
+        databaseURL: "https://rk-tech-eb179-default-rtdb.firebaseio.com",
+        projectId: "rk-tech-eb179"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    let masterData = [];
+    let myChart;
+
+    // Set Current Date
+    document.getElementById('currentDate').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    window.showPage = (id, btn) => {
+        document.querySelectorAll('.page-content').forEach(p => p.classList.add('hidden'));
+        document.getElementById(id).classList.remove('hidden');
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('nav-active'));
+        if(btn) btn.classList.add('nav-active');
+    };
+
+    window.addInstrumentRow = () => {
+        const div = document.createElement('div');
+        div.className = "flex gap-4 inst-row p-5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 page-animate";
+        div.innerHTML = `
+            <div class="flex-1"><input list="masterInstruments" class="inst-type input-field" placeholder="Type"></div>
+            <div class="w-1/3"><input class="inst-model input-field" placeholder="Model"></div>
+        `;
+        document.getElementById('instrumentContainer').appendChild(div);
+    };
+
+    window.saveData = () => {
+        const instruments = Array.from(document.querySelectorAll('.inst-row')).map(row => ({
+            type: row.querySelector('.inst-type').value,
+            model: row.querySelector('.inst-model').value
+        })).filter(i => i.type);
+
+        const data = {
+            client: document.getElementById('inClient').value,
+            district: document.getElementById('inDist').value,
+            industry: document.getElementById('inIndustry').value,
+            mobile: document.getElementById('inMobile').value,
+            gmail: document.getElementById('inEmail').value,
+            village: document.getElementById('inVillage').value,
+            instruments,
+            timestamp: Date.now()
+        };
+
+        if(!data.client) return alert("Client name required");
+        
+        push(ref(db, 'fleet_v4_pro'), data).then(() => {
+            alert("Fleet Registered Successfully!");
+            location.reload();
+        });
+    };
+
+    window.deleteRecord = (id) => {
+        if(confirm("Are you sure you want to remove this record?")) {
+            remove(ref(db, 'fleet_v4_pro/'+id));
+        }
+    };
+
+    // Excel Export Function
+    window.exportToExcel = () => {
+        const table = document.getElementById("fleetTable");
+        // Convert table to sheet
+        const ws = XLSX.utils.table_to_sheet(table);
+        // Create workbook
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "FleetInventory");
+        // Trigger download
+        XLSX.writeFile(wb, "Fleet_Sync_Inventory.xlsx");
+    };
+
+    onValue(ref(db, 'fleet_v4_pro'), snap => {
+        const raw = snap.val() || {};
+        masterData = Object.keys(raw).map(k => ({ id: k, ...raw[k] }));
+        renderData();
+    });
+
+    window.renderData = () => {
+        const q = document.getElementById('qBox').value.toLowerCase();
+        const tbody = document.getElementById('fleetBody');
+        tbody.innerHTML = "";
+        let stats = { total: 0, spm: 0, ocems: 0, other: 0, dist: {} };
+
+        const filtered = masterData.filter(d => 
+            (d.client || "").toLowerCase().includes(q) || 
+            (d.district || "").toLowerCase().includes(q) ||
+            (d.industry || "").toLowerCase().includes(q)
+        );
+
+        filtered.forEach(d => {
+            stats.total++;
+            if(d.instruments) d.instruments.forEach(i => {
+                if(i.type.toUpperCase().includes("SPM")) stats.spm++;
+                else if(i.type.toUpperCase().includes("OCEMS")) stats.ocems++;
+                else stats.other++;
+            });
+            if(d.district) stats.dist[d.district] = (stats.dist[d.district] || 0) + 1;
+
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
+                    <td class="px-8 py-6">
+                        <div class="font-bold text-slate-900 dark:text-white text-lg">${d.client}</div>
+                        <div class="inline-block mt-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase rounded">${d.industry || 'Industrial'}</div>
+                    </td>
+                    <td class="px-8 py-6">
+                        <div class="flex flex-col gap-2">
+                            <a href="tel:${d.mobile}" class="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-blue-500 transition">
+                                <i data-lucide="phone" class="w-3.5 h-3.5"></i> ${d.mobile || '---'}
+                            </a>
+                            <a href="mailto:${d.gmail}" class="flex items-center gap-2 text-xs text-slate-400 hover:text-blue-500 transition">
+                                <i data-lucide="mail" class="w-3.5 h-3.5"></i> ${d.gmail || '---'}
+                            </a>
+                        </div>
+                    </td>
+                    <td class="px-8 py-6">
+                        <div class="text-sm font-bold text-slate-700 dark:text-slate-300">${d.district}</div>
+                        <div class="text-xs text-slate-400">${d.village || ''}</div>
+                    </td>
+                    <td class="px-8 py-6">
+                        <div class="flex gap-1.5 flex-wrap">
+                            ${(d.instruments || []).map(i => `
+                                <span class="bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[9px] px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700 font-bold">
+                                    ${i.type}
+                                </span>`).join('')}
+                        </div>
+                    </td>
+                    <td class="px-8 py-6 text-right no-print">
+                        <button onclick="deleteRecord('${d.id}')" class="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition">
+                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        </button>
+                    </td>
+                </tr>`;
+        });
+
+        document.getElementById('statTotal').innerText = stats.total;
+        document.getElementById('statSpm').innerText = stats.spm;
+        document.getElementById('statOcems').innerText = stats.ocems;
+        document.getElementById('statOther').innerText = stats.other;
+        updateChart(stats.dist);
+        lucide.createIcons();
+    };
+
+    function updateChart(distData) {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        const isDark = document.documentElement.classList.contains('dark');
+        
+        if(myChart) myChart.destroy();
+        myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(distData),
+                datasets: [{ 
+                    label: 'Units', 
+                    data: Object.values(distData), 
+                    backgroundColor: '#3b82f6', 
+                    borderRadius: 8,
+                    barThickness: 30
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { color: isDark ? '#1e293b' : '#f1f5f9' },
+                        ticks: { color: '#94a3b8' }
+                    },
+                    x: { 
+                        grid: { display: false },
+                        ticks: { color: '#94a3b8' }
+                    }
+                }
+            }
+        });
+    }
+
+    window.toggleDarkMode = () => {
+        document.documentElement.classList.toggle('dark');
+        const isDark = document.documentElement.classList.contains('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        const dot = document.querySelector('.dot');
+        dot.style.transform = isDark ? 'translateX(16px)' : 'translateX(0)';
+        renderData();
+    };
+
+    if (localStorage.getItem('theme') === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.querySelector('.dot').style.transform = 'translateX(16px)';
+    }
+
+    lucide.createIcons();
+</script>
+</body>
+</html>
